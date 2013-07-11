@@ -52,6 +52,10 @@ module Rack
           @@request = request
         end
 
+        def new_session(token)
+          $authenticated = {}
+        end
+
       end
 
       # Honor the Rack contract by saving the passed Rack application in an ivar.
@@ -60,7 +64,29 @@ module Rack
       #   middleware chain.
       def initialize(app)
         @app = app
+        @password = if Rack::Webconsole.respond_to?(:console_password)
+          Rack::Webconsole.send(:console_password)
+        else
+          "secret"
+        end
+        @model_to_authenticate_against = if Rack::Webconsole.respond_to?(:model)
+          Rack::Webconsole.send(:model)
+        else
+          User
+        end
+        @session_identifier = if Rack::Webconsole.respond_to?(:session_identifier)
+          Rack::Webconsole.send(:session_identifier)
+        else
+          "user_id"
+        end
+      end
 
+      def authenticated?
+        $authenticated == true || @password.nil?
+      end
+
+      def authenticate(password_to_check, token)
+        return $authenticated[token] = (password_to_check == @password)
       end
 
       # Evaluates a string as Ruby code and returns the evaluated result as
@@ -74,20 +100,22 @@ module Rack
       #   and the evaluated Ruby result.
       def call(env)
         status, headers, response = @app.call(env)
-
         req = Rack::Request.new(env)
         params = req.params
         password = params['query'].delete(';') rescue ''
         return [status, headers, response] unless check_legitimate(req)
-        if @password && !authenticated?
-          if authenticate('#{password}')
-            response = 'You have been authenticated.'
-            return [status, headers, response]
+        return [status, headers, response] unless (req.env["rack.session"]["user_id"] && @model_to_authenticate_against.find(req.env["rack.session"][@session_identifier]))
+        Repl.new_session(params["token"]) unless $authenticated
+        if password && !$authenticated[params["token"]]==true
+          if authenticate("#{password}", params["token"])
+            result = 'You have been authenticated.'
+            got_output = true
           else
-            response = 'Please enter your console password:'
-            return [status, headers, response]
+            result = 'Please enter your console password:'
+            got_output = true
           end
         end
+
         hash = {}
         $pry_output ||= StringIO.new("")
         $pry_output.string = ""
@@ -113,39 +141,43 @@ module Rack
         code = params['query']
         hash[:prompt] = pry.select_prompt("", target) + Pry::Code.new(code).to_s
         got_output = false
-        begin
-          read_pipe, write_pipe = IO.pipe
-          end_line = "~~~~~ rack-webconsole end output ~~~~~\n"
+        if !result
+          begin
+            read_pipe, write_pipe = IO.pipe
+            end_line = "~~~~~ rack-webconsole end output ~~~~~\n"
 
-          thr = Thread.new do
-            while true
-              new_line = read_pipe.readline
-              break if new_line == end_line
-              $pry_output << new_line
+            thr = Thread.new do
+              while true
+                new_line = read_pipe.readline
+                break if new_line == end_line
+                $pry_output << new_line
+              end
             end
+
+            old_stdout = STDOUT.dup
+            old_stderr = STDERR.dup
+            STDOUT.reopen(write_pipe)
+            STDERR.reopen(write_pipe)
+            if !pry.process_command(code, "", target)
+              result = target.eval(code, Pry.eval_path, Pry.current_line)
+              got_output = true
+            end
+          rescue StandardError => e
+            error_out = "Error: " + e.message
+          ensure
+            write_pipe << end_line
+
+            thr.join
+            read_pipe.close
+            write_pipe.close
+            STDOUT.reopen(old_stdout)
+            STDERR.reopen(old_stderr)
+
           end
-
-          old_stdout = STDOUT.dup
-          old_stderr = STDERR.dup
-          STDOUT.reopen(write_pipe)
-          STDERR.reopen(write_pipe)
-          if !pry.process_command(code, "", target)
-            result = target.eval(code, Pry.eval_path, Pry.current_line)
-            got_output = true
-          end
-        rescue StandardError => e
-          error_out = "Error: " + e.message
-        ensure
-          write_pipe << end_line
-
-          thr.join
-          read_pipe.close
-          write_pipe.close
-          STDOUT.reopen(old_stdout)
-          STDERR.reopen(old_stderr)
-
+        else
+          got_output = true
         end
-
+        
         if got_output
           pry.set_last_result(result, target, code)
           Pry.print.call($pry_output, result) if pry.should_print?
@@ -168,6 +200,7 @@ module Rack
       end
 
       private
+
 
       def check_legitimate(req)
         req.post? && Repl.token_valid?(req.params['token'])

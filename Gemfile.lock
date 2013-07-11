@@ -37,6 +37,7 @@ DEPENDENCIES
   bluecloth
   minitest
   mocha
+  pry
   purdytest
   rack-webconsole-pry!
   rake

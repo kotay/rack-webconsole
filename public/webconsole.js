@@ -279,6 +279,12 @@ if (typeof module == "object" && typeof window == "undefined") {
             parseBashString(escapeHTML(data.result), mresult);
             result.append(mresult);
           }
+          console.log(data.result);
+          if (data.result.search("Please enter your console password") >= 0) {
+            $("#rack-webconsole form div.input input").addClass("hide_query");
+          }else if (data.result.search("You have been authenticated") >= 0) {
+            $("#rack-webconsole form div.input input").removeClass("hide_query");
+          };
           $("#rack-webconsole .results").append(result);
           $("#rack-webconsole .results_wrapper").scrollTop(
             $("#rack-webconsole .results").height()
