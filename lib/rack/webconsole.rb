@@ -23,7 +23,7 @@ module Rack
   # variables and giving a true IRB-esque experience.
   #
   class Webconsole
-    @@config = {:inject_jquery => false, :key_code => "[96]"}
+    @@config = {:inject_jquery => false, :key_code => "[96]", :console_password => nil}
 
     class << self
       # Returns whether the Asset injecter must inject JQuery or not.
@@ -56,6 +56,21 @@ module Rack
         value = MultiJson::encode(value)
         @@config[:key_code] = value
       end
+      
+      # Returns the console_password.
+      #
+      # @return [String] the console password.
+      def console_password
+        @@config[:console_password]
+      end
+
+      # Sets the console password.
+      #
+      # @param [String] value representing console password.
+      def console_password=(value)
+        @@config[:console_password] = value
+      end
+      
     end
 
     # Honor the Rack contract by saving the passed Rack application in an ivar.
