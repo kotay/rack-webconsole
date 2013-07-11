@@ -77,9 +77,17 @@ module Rack
 
         req = Rack::Request.new(env)
         params = req.params
-
+        password = params['query'].delete(';') rescue ''
         return [status, headers, response] unless check_legitimate(req)
-
+        if @password && !authenticated?
+          if authenticate('#{password}')
+            response = 'You have been authenticated.'
+            return [status, headers, response]
+          else
+            response = 'Please enter your console password:'
+            return [status, headers, response]
+          end
+        end
         hash = {}
         $pry_output ||= StringIO.new("")
         $pry_output.string = ""
