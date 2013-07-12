@@ -70,7 +70,7 @@ module Rack
           "secret"
         end
         @model_to_authenticate_against = if Rack::Webconsole.respond_to?(:model)
-          Rack::Webconsole.send(:model)
+          Rack::Webconsole.send(:model).constantize
         else
           User
         end
