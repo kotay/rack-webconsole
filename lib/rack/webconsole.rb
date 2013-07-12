@@ -70,6 +70,20 @@ module Rack
       def console_password=(value)
         @@config[:console_password] = value
       end
+
+      def model
+        @@config[:model]
+      end
+      def model=(value)
+        @@config[:model] = value
+      end
+
+      def session_identifier
+        @@config[:session_identifier]
+      end
+      def session_identifier=(value)
+        @@config[:session_identifier] = value
+      end
       
     end
 
