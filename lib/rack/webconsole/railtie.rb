@@ -7,7 +7,7 @@ module Rack
     #
     class Railtie < Rails::Railtie
       initializer 'rack-webconsole.add_middleware' do |app|
-        app.middleware.use Rack::Webconsole if Rails.env.development?
+        app.middleware.use Rack::Webconsole if Rails.env.development? || Rails.env.staging?
       end
     end
   end
